@@ -1,91 +1,47 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Mvc;
 using UserManagementServiceApi.Models;
 
 namespace UserManagementServiceApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/user")]
     [ApiController]
-    public class UsersController : ControllerBase
+    public class UsersController(UserContext context) : ControllerBase
     {
-        private readonly UserContext _context;
+        private readonly UserContext _context = context;
 
-        public UsersController(UserContext context)
+        [HttpPost]
+        public async Task<ActionResult<User>> CreateNewUser(User user)
         {
-            _context = context;
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(user);
         }
 
-        // GET: api/Users
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        [HttpPatch("{id}")]
+        public IActionResult UpdateUserState(Guid id, User userModel)
         {
-            return await _context.Users.ToListAsync();
-        }
+            if (id != userModel.Id)
+            {
+                return BadRequest();
+            }
 
-        // GET: api/Users/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUser(long id)
-        {
-            var user = await _context.Users.FindAsync(id);
+            var user = _context.Users.Find(userModel.Id);
 
             if (user == null)
             {
                 return NotFound();
             }
 
-            return user;
+            user.Active = userModel.Active;
+            _context.Update(user);
+            _context.SaveChanges();
+
+            return Ok();
         }
 
-        // PUT: api/Users/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutUser(long id, User user)
-        {
-            if (id != user.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(user).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UserExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Users
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task<ActionResult<User>> PostUser(User user)
-        {
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetUser", new { id = user.Id }, user);
-        }
-
-        // DELETE: api/Users/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(long id)
+        public async Task<IActionResult> DeleteUser(Guid id)
         {
             var user = await _context.Users.FindAsync(id);
             if (user == null)
@@ -99,9 +55,11 @@ namespace UserManagementServiceApi.Controllers
             return NoContent();
         }
 
-        private bool UserExists(long id)
+        [HttpGet]
+        public IEnumerable<User> ListAllActiveUsers()
         {
-            return _context.Users.Any(e => e.Id == id);
+            var allActiveUsers = _context.Users.Where(u => u.Active == true);
+            return allActiveUsers;
         }
     }
 }
